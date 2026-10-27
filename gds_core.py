@@ -238,3 +238,27 @@ def graficar(e: Ensayo, x: str, y: str, intercambiar=False, escala_x="lineal",
         ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
     return fig, avisos
+
+
+def ajustes_union(e: Ensayo, x: str, y: str, intercambiar: bool, stages, eje: str = "y"):
+    """
+    Calcula desplazamientos para que el inicio de cada stage quede donde
+    terminó el anterior, sobre el eje indicado ('x' o 'y', en el eje mostrado).
+    Usa el promedio de las primeras y últimas 5 lecturas para reducir el ruido.
+    Devuelve {stage: (desp_x, desp_y)}; ajustarlo a mano después es normal.
+    """
+    xc, yc = (y, x) if intercambiar else (x, y)
+    col = yc if eje == "y" else xc
+    ajustes, acumulado, fin_anterior = {}, 0.0, None
+    for st in sorted(stages):
+        g = e.df[e.df["stage"] == st][col].dropna()
+        if g.empty:
+            continue
+        inicio = g.iloc[:5].mean()
+        fin = g.iloc[-5:].mean()
+        if fin_anterior is not None:
+            acumulado = fin_anterior - inicio
+        ajustes[int(st)] = (acumulado if eje == "x" else 0.0,
+                            acumulado if eje == "y" else 0.0)
+        fin_anterior = fin + acumulado
+    return ajustes

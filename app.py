@@ -8,7 +8,7 @@ import io
 import pandas as pd
 import streamlit as st
 
-from gds_core import ESCALAS, graficar, leer_gds, opciones_ejes, resumen
+from gds_core import ESCALAS, ajustes_union, graficar, leer_gds, opciones_ejes, resumen
 
 st.set_page_config(page_title="Visualizador GDS", layout="wide")
 st.title("Visualizador de ensayos GDS")
@@ -80,8 +80,23 @@ with st.sidebar.expander("Desplazar cada stage"):
         "Por ejemplo, para colocar un stage debajo de otro, usa Desp. Y "
         "con el valor del final del stage anterior."
     )
-    tabla = pd.DataFrame({"Stage": todas, "Desp. X": 0.0, "Desp. Y": 0.0})
-    editada = st.data_editor(tabla, hide_index=True, disabled=["Stage"], key="ajustes_stage")
+    eje_union = st.radio("Unir sobre el eje", ["Y", "X"], horizontal=True)
+    if st.button("Calcular unión automática"):
+        st.session_state["base_ajustes"] = ajustes_union(
+            ensayo, x, y, intercambiar, todas, eje=eje_union.lower()
+        )
+        st.session_state["version_ajuste"] = st.session_state.get("version_ajuste", 0) + 1
+    base = st.session_state.get("base_ajustes", {})
+    version = st.session_state.get("version_ajuste", 0)
+    tabla = pd.DataFrame({
+        "Stage": todas,
+        "Desp. X": [base.get(s, (0.0, 0.0))[0] for s in todas],
+        "Desp. Y": [base.get(s, (0.0, 0.0))[1] for s in todas],
+    })
+    # La clave cambia al recalcular, así la tabla muestra los valores nuevos
+    editada = st.data_editor(
+        tabla, hide_index=True, disabled=["Stage"], key=f"ajustes_{version}"
+    )
 ajustes = {
     int(f["Stage"]): (float(f["Desp. X"]), float(f["Desp. Y"]))
     for _, f in editada.iterrows()
