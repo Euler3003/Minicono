@@ -205,20 +205,35 @@ def preparar(e: Ensayo, x: str, y: str, intercambiar: bool, escala_x: str, escal
 
 def graficar(e: Ensayo, x: str, y: str, intercambiar=False, escala_x="lineal",
              escala_y="lineal", stages=None, modo="conjunto", desplazamiento=0.0,
-             mediana=1, leyenda=True, titulo=None):
+             mediana=1, leyenda=True, titulo=None, invertir_y=False,
+             limites=None, ajustes=None):
+    """
+    ajustes: {stage: (desp_x, desp_y)} en unidades del eje mostrado.
+             Permite colocar cada stage a continuación de otra.
+    limites: {"xmin", "xmax", "ymin", "ymax"}; None = automático.
+    invertir_y: el valor mayor queda abajo (perfiles de profundidad).
+    """
     d, x, y, ex, ey, avisos = preparar(
         e, x, y, intercambiar, escala_x, escala_y, stages, modo, mediana
     )
+    ajustes = ajustes or {}
+    limites = limites or {}
     fig, ax = plt.subplots(figsize=(9, 6))
     for k, (st, g) in enumerate(d.groupby("stage")):
+        dx, dy = ajustes.get(int(st), (0.0, 0.0))
         off = k * desplazamiento if modo == "superpuesto" else 0.0
-        ax.plot(g[x], g[y] + off, lw=0.9, label=f"Stage {st}")
+        ax.plot(g[x] + dx, g[y] + dy + off, lw=0.9, label=f"Stage {st}")
     ax.set_xscale(ESCALAS[ex])
     ax.set_yscale(ESCALAS[ey])
     ax.set_xlabel(etiqueta(e, x))
     ax.set_ylabel(etiqueta(e, y))
     ax.set_title(titulo or f"{e.nombre} ({modo})")
     ax.grid(True, which="both", alpha=0.3)
+    # Zoom: None mantiene el límite automático
+    ax.set_xlim(limites.get("xmin"), limites.get("xmax"))
+    ax.set_ylim(limites.get("ymin"), limites.get("ymax"))
+    if invertir_y:
+        ax.invert_yaxis()  # después de set_ylim, para que los límites sigan siendo válidos
     if leyenda:
         ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()

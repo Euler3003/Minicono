@@ -5,6 +5,7 @@ Ejecutar localmente:  streamlit run app.py
 """
 import io
 
+import pandas as pd
 import streamlit as st
 
 from gds_core import ESCALAS, graficar, leer_gds, opciones_ejes, resumen
@@ -41,13 +42,26 @@ intercambiar = st.sidebar.checkbox("Intercambiar X e Y")
 escalas = list(ESCALAS)
 escala_x = st.sidebar.radio("Escala X", escalas, horizontal=True)
 escala_y = st.sidebar.radio("Escala Y", escalas, horizontal=True)
+invertir_y = st.sidebar.checkbox(
+    "Invertir eje Y (valores hacia abajo)",
+    help="Útil para perfiles de profundidad: el origen queda arriba.",
+)
+
+# Eje mostrado en X e Y (después del intercambio)
+xc, yc = (y, x) if intercambiar else (x, y)
+
+st.sidebar.subheader("Zoom")
+limites = {}
+if st.sidebar.checkbox("Límites manuales"):
+    c1, c2 = st.sidebar.columns(2)
+    limites["xmin"] = c1.number_input("X mín", value=float(ensayo.df[xc].min()), key=f"xmin_{xc}")
+    limites["xmax"] = c2.number_input("X máx", value=float(ensayo.df[xc].max()), key=f"xmax_{xc}")
+    limites["ymin"] = c1.number_input("Y mín", value=float(ensayo.df[yc].min()), key=f"ymin_{yc}")
+    limites["ymax"] = c2.number_input("Y máx", value=float(ensayo.df[yc].max()), key=f"ymax_{yc}")
 
 st.sidebar.subheader("Stages")
-stages = st.sidebar.multiselect(
-    "Stages a mostrar",
-    sorted(ensayo.df["stage"].unique().tolist()),
-    default=sorted(ensayo.df["stage"].unique().tolist()),
-)
+todas = sorted(ensayo.df["stage"].unique().tolist())
+stages = st.sidebar.multiselect("Stages a mostrar", todas, default=todas)
 modo = st.sidebar.radio(
     "Modo",
     ["conjunto", "superpuesto"],
@@ -59,6 +73,20 @@ if modo == "superpuesto":
         "Separación vertical entre stages", value=0.0, step=0.5
     )
 
+st.sidebar.subheader("Unir stages")
+with st.sidebar.expander("Desplazar cada stage"):
+    st.caption(
+        "Suma un valor a cada stage, en las unidades del eje mostrado. "
+        "Por ejemplo, para colocar un stage debajo de otro, usa Desp. Y "
+        "con el valor del final del stage anterior."
+    )
+    tabla = pd.DataFrame({"Stage": todas, "Desp. X": 0.0, "Desp. Y": 0.0})
+    editada = st.data_editor(tabla, hide_index=True, disabled=["Stage"], key="ajustes_stage")
+ajustes = {
+    int(f["Stage"]): (float(f["Desp. X"]), float(f["Desp. Y"]))
+    for _, f in editada.iterrows()
+}
+
 st.sidebar.subheader("Filtro")
 mediana = st.sidebar.slider("Mediana móvil (1 = sin filtro)", 1, 21, 1, step=2)
 
@@ -68,6 +96,7 @@ fig, avisos = graficar(
     escala_x=escala_x, escala_y=escala_y,
     stages=stages or None, modo=modo,
     desplazamiento=desplazamiento, mediana=mediana,
+    invertir_y=invertir_y, limites=limites or None, ajustes=ajustes,
 )
 for aviso in avisos:
     st.warning(aviso)
